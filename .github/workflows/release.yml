@@ -1,0 +1,52 @@
+name: release
+
+# Push a tag like v0.1.0 to build the linux/amd64 and linux/arm64 binaries and
+# publish them as a GitHub Release. The asset names are version-less
+# (vnetviz_linux_<arch>.tar.gz) so that install.sh can fetch them from the
+# /releases/latest/download/ URL without first resolving the tag.
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.26"
+
+      - name: Build binaries
+        env:
+          VERSION: ${{ github.ref_name }}
+          CGO_ENABLED: "0"
+        run: |
+          mkdir -p dist
+          for arch in amd64 arm64; do
+            echo "building linux/$arch"
+            GOOS=linux GOARCH="$arch" go build \
+              -ldflags "-s -w -X main.version=${VERSION}" \
+              -o "dist/vnetviz" ./cmd/vnetviz
+            tar -C dist -czf "dist/vnetviz_linux_${arch}.tar.gz" vnetviz
+            rm -f dist/vnetviz
+          done
+          cd dist && sha256sum vnetviz_linux_*.tar.gz > checksums.txt
+          cat dist/checksums.txt
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ github.ref_name }}" \
+            --repo "${{ github.repository }}" \
+            --title "${{ github.ref_name }}" \
+            --generate-notes \
+            dist/vnetviz_linux_amd64.tar.gz \
+            dist/vnetviz_linux_arm64.tar.gz \
+            dist/checksums.txt
