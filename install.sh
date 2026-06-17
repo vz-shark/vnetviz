@@ -22,8 +22,20 @@ VERSION="${VNETVIZ_VERSION:-latest}"
 BIN_DIR="${VNETVIZ_BIN_DIR:-/usr/local/bin}"
 BINARY="vnetviz"
 
-err() { printf 'install: %s\n' "$*" >&2; }
-die() { err "$*"; exit 1; }
+# --- logging -----------------------------------------------------------------
+# Level-labelled output, colorized only when stderr is a terminal (plain when
+# piped or redirected). Everything goes to stderr so stdout stays clean.
+if [ -t 2 ]; then
+	_e=$(printf '\033')
+	C_INFO="${_e}[36m"; C_OK="${_e}[32m"; C_WARN="${_e}[33m"; C_ERR="${_e}[31m"; C_OFF="${_e}[0m"
+else
+	C_INFO=; C_OK=; C_WARN=; C_ERR=; C_OFF=
+fi
+info()    { printf '%sInfo:%s %s\n'    "$C_INFO" "$C_OFF" "$*" >&2; }
+warn()    { printf '%sWarn:%s %s\n'    "$C_WARN" "$C_OFF" "$*" >&2; }
+error()   { printf '%sError:%s %s\n'   "$C_ERR"  "$C_OFF" "$*" >&2; }
+success() { printf '%sSuccess:%s %s\n' "$C_OK"   "$C_OFF" "$*" >&2; }
+die() { error "$*"; exit 1; }
 
 # --- detect platform ---------------------------------------------------------
 os="$(uname -s)"
@@ -80,7 +92,7 @@ sums_url="${base}/checksums.txt"
 tmp="$(mktemp -d "${TMPDIR:-/tmp}/vnetviz-install.XXXXXX")"
 trap 'rm -rf "$tmp"' EXIT INT TERM
 
-err "downloading ${asset} (${VERSION})"
+info "downloading ${asset} (${VERSION})"
 dl "$asset_url" "$tmp/$asset" || die "download failed: $asset_url"
 
 # --- verify checksum ---------------------------------------------------------
@@ -97,9 +109,9 @@ if [ "${VNETVIZ_NO_VERIFY:-0}" != "1" ]; then
 		[ -n "$want" ] || die "no checksum for $asset in checksums.txt"
 		got="$($sha_cmd "$tmp/$asset" | awk '{print $1}')"
 		[ "$want" = "$got" ] || die "checksum mismatch for $asset (want $want, got $got)"
-		err "checksum ok"
+		info "checksum verified"
 	else
-		err "warning: skipping checksum verification (checksums.txt or sha256 tool unavailable)"
+		warn "skipping checksum verification (checksums.txt or sha256 tool unavailable)"
 	fi
 fi
 
@@ -116,19 +128,18 @@ if [ "$(id -u)" = "0" ] || [ -w "$BIN_DIR" ] ||
 	mkdir -p "$BIN_DIR"
 	install -m 0755 "$tmp/$BINARY" "$BIN_DIR/$BINARY"
 else
-	err "cannot write to $BIN_DIR without elevated privileges."
-	err "re-run with sudo:"
-	err "    curl -fsSL https://raw.githubusercontent.com/${REPO}/main/install.sh | sudo sh"
-	err "or install into a directory you own:"
-	err "    curl -fsSL https://raw.githubusercontent.com/${REPO}/main/install.sh | VNETVIZ_BIN_DIR=\"\$HOME/.local/bin\" sh"
+	error "cannot write to $BIN_DIR without elevated privileges — nothing was installed."
+	printf '       re-run with sudo:\n' >&2
+	printf '           curl -fsSL https://raw.githubusercontent.com/%s/main/install.sh | sudo sh\n' "$REPO" >&2
+	printf '       or install into a directory you own:\n' >&2
+	printf '           curl -fsSL https://raw.githubusercontent.com/%s/main/install.sh | VNETVIZ_BIN_DIR="$HOME/.local/bin" sh\n' "$REPO" >&2
 	exit 1
 fi
 
 # --- report ------------------------------------------------------------------
 installed="$BIN_DIR/$BINARY"
-err "installed $installed"
-if command -v "$BINARY" >/dev/null 2>&1 && [ "$(command -v "$BINARY")" = "$installed" ]; then
-	"$installed" --version 2>/dev/null || true
-else
-	err "note: $BIN_DIR is not on your PATH; run it as $installed or add $BIN_DIR to PATH"
+ver_line=$("$installed" --version 2>/dev/null | head -n1)
+success "${ver_line:-$BINARY} installed to $installed"
+if ! { command -v "$BINARY" >/dev/null 2>&1 && [ "$(command -v "$BINARY")" = "$installed" ]; }; then
+	warn "$BIN_DIR is not on your PATH — run it as $installed, or add $BIN_DIR to PATH"
 fi
