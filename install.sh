@@ -33,28 +33,46 @@ case "$(uname -m)" in
 	*) die "unsupported architecture: $(uname -m) (only amd64 and arm64 are published)" ;;
 esac
 
-asset="${BINARY}_linux_${arch}.tar.gz"
-
 # --- pick a downloader -------------------------------------------------------
+# latest_tag resolves the most recent release tag from the /releases/latest
+# redirect target, so no GitHub API call (and no rate limit) is needed.
 if command -v curl >/dev/null 2>&1; then
 	dl() { curl -fsSL "$1" -o "$2"; }
+	latest_tag() {
+		url=$(curl -fsSLI -o /dev/null -w '%{url_effective}' \
+			"https://github.com/${REPO}/releases/latest") || return 1
+		printf '%s\n' "${url##*/}"
+	}
 elif command -v wget >/dev/null 2>&1; then
 	dl() { wget -qO "$2" "$1"; }
+	latest_tag() {
+		url=$(wget -S --max-redirect=0 -O /dev/null \
+			"https://github.com/${REPO}/releases/latest" 2>&1 \
+			| awk 'tolower($1) == "location:" { print $2 }' | tr -d '\r' | tail -n1)
+		[ -n "$url" ] && printf '%s\n' "${url##*/}"
+	}
 else
 	die "need curl or wget to download releases"
 fi
 
-# --- resolve URLs ------------------------------------------------------------
-if [ -n "${VNETVIZ_BASE_URL:-}" ]; then
-	asset_url="${VNETVIZ_BASE_URL%/}/${asset}"
-	sums_url="${VNETVIZ_BASE_URL%/}/checksums.txt"
-elif [ "$VERSION" = "latest" ]; then
-	asset_url="https://github.com/${REPO}/releases/latest/download/${asset}"
-	sums_url="https://github.com/${REPO}/releases/latest/download/checksums.txt"
-else
-	asset_url="https://github.com/${REPO}/releases/download/${VERSION}/${asset}"
-	sums_url="https://github.com/${REPO}/releases/download/${VERSION}/checksums.txt"
+# --- resolve version, asset name, and URLs -----------------------------------
+# Asset names embed the version (vnetviz_<ver>_linux_<arch>.tar.gz), so when
+# installing "latest" we must first resolve the concrete tag.
+if [ "$VERSION" = "latest" ] && [ -z "${VNETVIZ_BASE_URL:-}" ]; then
+	VERSION="$(latest_tag)" || die "could not resolve the latest release tag"
+	[ -n "$VERSION" ] || die "could not resolve the latest release tag"
 fi
+[ "$VERSION" != "latest" ] || die "set VNETVIZ_VERSION (e.g. v0.1.0) when using VNETVIZ_BASE_URL"
+
+asset="${BINARY}_${VERSION#v}_linux_${arch}.tar.gz"
+
+if [ -n "${VNETVIZ_BASE_URL:-}" ]; then
+	base="${VNETVIZ_BASE_URL%/}"
+else
+	base="https://github.com/${REPO}/releases/download/${VERSION}"
+fi
+asset_url="${base}/${asset}"
+sums_url="${base}/checksums.txt"
 
 # --- download into a temp dir ------------------------------------------------
 tmp="$(mktemp -d "${TMPDIR:-/tmp}/vnetviz-install.XXXXXX")"

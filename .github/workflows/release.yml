@@ -27,16 +27,17 @@ jobs:
           VERSION: ${{ github.ref_name }}
           CGO_ENABLED: "0"
         run: |
+          ver="${VERSION#v}"
           mkdir -p dist
           for arch in amd64 arm64; do
             echo "building linux/$arch"
             GOOS=linux GOARCH="$arch" go build \
               -ldflags "-s -w -X main.version=${VERSION}" \
               -o "dist/vnetviz" ./cmd/vnetviz
-            tar -C dist -czf "dist/vnetviz_linux_${arch}.tar.gz" vnetviz
+            tar -C dist -czf "dist/vnetviz_${ver}_linux_${arch}.tar.gz" vnetviz
             rm -f dist/vnetviz
           done
-          cd dist && sha256sum vnetviz_linux_*.tar.gz > checksums.txt
+          ( cd dist && sha256sum vnetviz_*_linux_*.tar.gz > checksums.txt )
           cat dist/checksums.txt
 
       - name: Create release
@@ -47,6 +48,6 @@ jobs:
             --repo "${{ github.repository }}" \
             --title "${{ github.ref_name }}" \
             --generate-notes \
-            dist/vnetviz_linux_amd64.tar.gz \
-            dist/vnetviz_linux_arm64.tar.gz \
+            dist/vnetviz_*_linux_amd64.tar.gz \
+            dist/vnetviz_*_linux_arm64.tar.gz \
             dist/checksums.txt
