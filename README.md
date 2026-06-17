@@ -147,35 +147,6 @@ only add the host's own loopback/physical NICs and addresses.
 |  | `--up-only` | hide interfaces that are operationally down |
 | Misc | `--version` | print version and exit |
 
-## Examples
-
-The [`examples/`](examples/) directory has a runnable demo and scripts that
-render it:
-
-- Topologies you can bring up by hand, each like `docker compose up`:
-  - [`examples/compose/`](examples/compose/) — a Docker Compose stack
-    (nginx reverse proxy → API → postgres, with an internal backend network).
-  - [`examples/netns-lab.sh`](examples/netns-lab.sh) — a routed two-LAN lab
-    built from `ip netns` (two LANs joined by a dual-homed router netns).
-  - [`examples/vlan-lab.sh`](examples/vlan-lab.sh) — a dummy uplink carrying two
-    802.1Q tagged subinterfaces.
-- [`examples/gen-samples.sh`](examples/gen-samples.sh) `[OUTDIR]` — render the
-  current live topology in every format, with and without `--collapse`.
-- [`examples/capture-samples.sh`](examples/capture-samples.sh) — bring each
-  topology up, render it into `examples/samples/<scenario>/` (`docker`, `netns`,
-  `vlan`), and also save a `without-vnetviz.txt` of the raw `ip`/`bridge` output
-  for a before/after comparison.
-
-The `*-lab.sh` scripts mirror `docker compose`: `up` builds the topology and
-waits (Ctrl-C tears it down), `up -d` builds and returns, `down` tears it down.
-
-```bash
-# routed netns lab: build, inspect, Ctrl-C to clean up
-sudo examples/netns-lab.sh up
-# in another shell, while it is up:
-sudo vnetviz
-```
-
 ## How it works
 
 * Interfaces and addresses are read with netlink (`vishvananda/netlink`).
