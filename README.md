@@ -12,20 +12,24 @@ Linux Network  ->  internal graph  ->  Mermaid / DOT  ->  SVG / PNG
 
 ## Install
 
-One-liner (downloads a prebuilt Linux binary into `/usr/local/bin`, using
-`sudo` only if that directory is not writable):
+One-liner (downloads a prebuilt Linux binary into `/usr/local/bin`, which
+usually needs root — hence `sudo sh`):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/vz-shark/vnetviz/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/vz-shark/vnetviz/main/install.sh | sudo sh
 ```
 
-It verifies the release's SHA-256 checksum before installing. To pin a version
-or change the target directory, set `VNETVIZ_VERSION` / `VNETVIZ_BIN_DIR`:
+The script never calls `sudo` on its own; if `/usr/local/bin` is not writable it
+just tells you to re-run with `sudo`. To install without root, point
+`VNETVIZ_BIN_DIR` at a directory you own:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/vz-shark/vnetviz/main/install.sh \
-  | VNETVIZ_VERSION=v0.1.0 VNETVIZ_BIN_DIR="$HOME/.local/bin" sh
+  | VNETVIZ_BIN_DIR="$HOME/.local/bin" sh
 ```
+
+It verifies the release's SHA-256 checksum before installing. Pin a version with
+`VNETVIZ_VERSION` (e.g. `VNETVIZ_VERSION=v0.1.0`).
 
 With Go installed you can instead use `go install`:
 

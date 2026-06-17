@@ -1,11 +1,13 @@
 #!/bin/sh
 # vnetviz installer.
 #
-#   curl -fsSL https://raw.githubusercontent.com/vz-shark/vnetviz/main/install.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/vz-shark/vnetviz/main/install.sh | sudo sh
 #
 # Downloads a prebuilt vnetviz binary from GitHub Releases and installs it into
-# /usr/local/bin (using sudo if that directory is not writable). vnetviz is a
-# Linux-only tool, so only linux/amd64 and linux/arm64 are published.
+# /usr/local/bin. This script never calls sudo itself: if the target directory
+# is not writable it tells you to re-run with sudo (or to pick a writable
+# VNETVIZ_BIN_DIR) and exits. vnetviz is a Linux-only tool, so only linux/amd64
+# and linux/arm64 are published.
 #
 # Environment overrides (mostly for testing / unusual setups):
 #   VNETVIZ_VERSION   release to install: "latest" (default) or a tag like v0.1.0
@@ -106,21 +108,20 @@ tar -xzf "$tmp/$asset" -C "$tmp" || die "failed to extract $asset"
 [ -f "$tmp/$BINARY" ] || die "archive did not contain a '$BINARY' binary"
 chmod +x "$tmp/$BINARY"
 
-# --- install (sudo only if needed) -------------------------------------------
-install_to() {
-	# $1 = the command prefix ("" or "sudo")
-	$1 mkdir -p "$BIN_DIR" && $1 install -m 0755 "$tmp/$BINARY" "$BIN_DIR/$BINARY"
-}
-
-if [ -w "$BIN_DIR" ] || { [ ! -e "$BIN_DIR" ] && [ -w "$(dirname "$BIN_DIR")" ]; }; then
-	install_to ""
-elif [ "$(id -u)" = "0" ]; then
-	install_to ""
-elif command -v sudo >/dev/null 2>&1; then
-	err "elevating with sudo to write to $BIN_DIR"
-	install_to "sudo"
+# --- install -----------------------------------------------------------------
+# This script never calls sudo itself. If the target directory is not writable,
+# it explains how to re-run with elevated privileges and exits.
+if [ "$(id -u)" = "0" ] || [ -w "$BIN_DIR" ] ||
+	{ [ ! -e "$BIN_DIR" ] && [ -w "$(dirname "$BIN_DIR")" ]; }; then
+	mkdir -p "$BIN_DIR"
+	install -m 0755 "$tmp/$BINARY" "$BIN_DIR/$BINARY"
 else
-	die "cannot write to $BIN_DIR and sudo is not available; set VNETVIZ_BIN_DIR to a writable path"
+	err "cannot write to $BIN_DIR without elevated privileges."
+	err "re-run with sudo:"
+	err "    curl -fsSL https://raw.githubusercontent.com/${REPO}/main/install.sh | sudo sh"
+	err "or install into a directory you own:"
+	err "    curl -fsSL https://raw.githubusercontent.com/${REPO}/main/install.sh | VNETVIZ_BIN_DIR=\"\$HOME/.local/bin\" sh"
+	exit 1
 fi
 
 # --- report ------------------------------------------------------------------
