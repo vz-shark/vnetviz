@@ -1,9 +1,9 @@
 name: release
 
 # Push a tag like v0.1.0 to build the linux/amd64 and linux/arm64 binaries and
-# publish them as a GitHub Release. The asset names are version-less
-# (vnetviz_linux_<arch>.tar.gz) so that install.sh can fetch them from the
-# /releases/latest/download/ URL without first resolving the tag.
+# publish them as a GitHub Release. Asset names embed the version
+# (vnetviz_<version>_linux_<arch>.tar.gz); install.sh resolves the latest tag
+# from the /releases/latest redirect before downloading.
 on:
   push:
     tags:
