@@ -3,11 +3,14 @@
 **Visualize Linux virtual network topology**   
  (namespace / veth / bridge / bond / vlan / docker / podman)
 
+Linux networking becomes difficult to understand when network namespaces, veth pairs, bridges, Docker, and Podman networks are mixed together.  
+`vnetviz` automatically discovers these relationships and renders them as diagrams.
+
+<p align="left">
+  <img src="sample-docker.svg" width="600">
+</p>
 
 ## Features
-`vnetviz` auto-detects the Linux network configuration — network namespaces,
-veth pairs, bridges, bonds, VLANs, Docker and Podman containers — and emits a
-human-friendly diagram as a Text tree, Mermaid, or Graphviz (DOT/SVG/PNG).
 
 - Detect network namespaces
 - Detect veth peer relationships
@@ -15,6 +18,28 @@ human-friendly diagram as a Text tree, Mermaid, or Graphviz (DOT/SVG/PNG).
 - Docker / Podman support
 - Export to Mermaid / Graphviz (DOT/SVG/PNG)　
 - ASCII output
+
+## Install
+
+One-liner (downloads a prebuilt Linux binary into `/usr/local/bin`, which
+usually needs root — hence `sudo sh`):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/vz-shark/vnetviz/main/install.sh | sudo sh
+```
+
+The script never calls `sudo` on its own; if `/usr/local/bin` is not writable it
+just tells you to re-run with `sudo`. To install without root, point
+`VNETVIZ_BIN_DIR` at a directory you own:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/vz-shark/vnetviz/main/install.sh \
+  | VNETVIZ_BIN_DIR="$HOME/.local/bin" sh
+```
+
+It verifies the release's SHA-256 checksum before installing. Pin a version with
+`VNETVIZ_VERSION` (e.g. `VNETVIZ_VERSION=v0.1.0`).
+
 
 ## Example
 
@@ -46,32 +71,13 @@ human-friendly diagram as a Text tree, Mermaid, or Graphviz (DOT/SVG/PNG).
   ```
   sudo vnetviz --format svg -o sample.svg  
   ```
-  ![sample](sample-docker.svg)
+<p align="left">
+  <img src="sample-docker.svg" width="600">
+</p>
 
 <!-- - more samples is [here](./samples/) -->
 
 
-
-## Install
-
-One-liner (downloads a prebuilt Linux binary into `/usr/local/bin`, which
-usually needs root — hence `sudo sh`):
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/vz-shark/vnetviz/main/install.sh | sudo sh
-```
-
-The script never calls `sudo` on its own; if `/usr/local/bin` is not writable it
-just tells you to re-run with `sudo`. To install without root, point
-`VNETVIZ_BIN_DIR` at a directory you own:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/vz-shark/vnetviz/main/install.sh \
-  | VNETVIZ_BIN_DIR="$HOME/.local/bin" sh
-```
-
-It verifies the release's SHA-256 checksum before installing. Pin a version with
-`VNETVIZ_VERSION` (e.g. `VNETVIZ_VERSION=v0.1.0`).
 
 
 ## Usage
