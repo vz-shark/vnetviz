@@ -3,6 +3,4 @@
 /vnetviz
 coverage.out
 
-# Rendered diagrams produced by `make svg` / examples
-*.svg
-*.png
+!sample*.svg

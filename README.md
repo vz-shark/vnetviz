@@ -1,14 +1,56 @@
-# vnetviz
+# vnetviz  
 
-**Visualize Linux network topology as Mermaid / Graphviz**
+**Visualize Linux virtual network topology**   
+ (namespace / veth / bridge / bond / vlan / docker / podman)
 
+
+## Features
 `vnetviz` auto-detects the Linux network configuration — network namespaces,
 veth pairs, bridges, bonds, VLANs, Docker and Podman containers — and emits a
-human-friendly diagram as a text tree, Mermaid, or Graphviz (DOT/SVG/PNG).
+human-friendly diagram as a Text tree, Mermaid, or Graphviz (DOT/SVG/PNG).
 
-```text
-Linux Network  ->  internal graph  ->  Mermaid / DOT  ->  SVG / PNG
-```
+- Detect network namespaces
+- Detect veth peer relationships
+- Detect bridges and ports
+- Docker / Podman support
+- Export to Mermaid / Graphviz (DOT/SVG/PNG)　
+- ASCII output
+
+## Example
+
+- text output
+  ```
+  $ sudo vnetviz 
+  host
+  ├─ br-8c201ea87893  [bridge]  (demo_frontend)  172.18.0.1/16  up
+  │　└─ veth6dfa4c8  ==( veth )==  eth1  @demo-web-1 (docker)  172.18.0.2/16  up
+  ├─ br-8dad108b2b2b  [bridge]  (demo_backend)  172.19.0.1/16  up
+  │　├─ vetha70dea7  ==( veth )==  eth0  @demo-api-1 (docker)  172.19.0.2/16  up
+  │　├─ vethf03dc6c  ==( veth )==  eth0  @demo-db-1 (docker)  172.19.0.3/16  up
+  │　└─ veth62b5a80  ==( veth )==  eth0  @demo-web-1 (docker)  172.19.0.4/16  up
+  └─ host:8080  ==>  demo-web-1:80/tcp
+
+  demo-web-1 (docker)
+  ├─ eth0  ==( veth )==  veth62b5a80  @host  172.19.0.4/16  up
+  └─ eth1  ==( veth )==  veth6dfa4c8  @host  172.18.0.2/16  up
+
+  demo-db-1 (docker)
+  └─ eth0  ==( veth )==  vethf03dc6c  @host  172.19.0.3/16  up
+
+  demo-api-1 (docker)
+  └─ eth0  ==( veth )==  vetha70dea7  @host  172.19.0.2/16  up
+
+  ```
+
+- SVG output
+  ```
+  sudo vnetviz --format svg -o sample.svg  
+  ```
+  ![sample](sample-docker.svg)
+
+<!-- - more samples is [here](./samples/) -->
+
+
 
 ## Install
 
@@ -31,17 +73,6 @@ curl -fsSL https://raw.githubusercontent.com/vz-shark/vnetviz/main/install.sh \
 It verifies the release's SHA-256 checksum before installing. Pin a version with
 `VNETVIZ_VERSION` (e.g. `VNETVIZ_VERSION=v0.1.0`).
 
-With Go installed you can instead use `go install`:
-
-```bash
-go install github.com/vz-shark/vnetviz/cmd/vnetviz@latest
-```
-
-Or build from source:
-
-```bash
-go build -o vnetviz ./cmd/vnetviz
-```
 
 ## Usage
 
