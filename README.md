@@ -1,14 +1,46 @@
 # vnetviz  
 
-**Visualize Linux virtual network topology**   
+**Visualize Linux virtual network topology**  
  (namespace / veth / bridge / bond / vlan / docker / podman)
 
-Linux networking becomes difficult to understand when network namespaces, veth pairs, bridges, Docker, and Podman networks are mixed together.  
-`vnetviz` automatically discovers these relationships and renders them as diagrams.
+## Why ?
+### The Problem
+Linux networking can quickly become complex when network namespaces, veth pairs, bridges, Docker, and Podman networks are combined. 
 
-<p align="left">
-  <img src="sample-docker.svg" width="600">
-</p>
+Understanding the topology often requires manually correlating the outputs of commands such as `ip link`, `ip netns`, `bridge`, `docker`, and `podman`, which becomes increasingly difficult as environments grow.
+
+
+### The Solution
+`vnetviz` automatically discovers these relationships and renders them as:
+
+- diagrams
+  <p align="left">
+    <img src="sample-docker.svg" width="600">
+  </p>
+
+- text tree
+  ```
+  $ sudo vnetviz 
+  host
+  ├─ br-8c201ea87893  [bridge]  (demo_frontend)  172.18.0.1/16  up
+  │　└─ veth6dfa4c8  ==( veth )==  eth1  @demo-web-1 (docker)  172.18.0.2/16  up
+  ├─ br-8dad108b2b2b  [bridge]  (demo_backend)  172.19.0.1/16  up
+  │　├─ vetha70dea7  ==( veth )==  eth0  @demo-api-1 (docker)  172.19.0.2/16  up
+  │　├─ vethf03dc6c  ==( veth )==  eth0  @demo-db-1 (docker)  172.19.0.3/16  up
+  │　└─ veth62b5a80  ==( veth )==  eth0  @demo-web-1 (docker)  172.19.0.4/16  up
+  └─ host:8080  ==>  demo-web-1:80/tcp
+
+  demo-web-1 (docker)
+  ├─ eth0  ==( veth )==  veth62b5a80  @host  172.19.0.4/16  up
+  └─ eth1  ==( veth )==  veth6dfa4c8  @host  172.18.0.2/16  up
+
+  demo-db-1 (docker)
+  └─ eth0  ==( veth )==  vethf03dc6c  @host  172.19.0.3/16  up
+
+  demo-api-1 (docker)
+  └─ eth0  ==( veth )==  vetha70dea7  @host  172.19.0.2/16  up
+
+  ```
 
 ## Features
 
@@ -40,42 +72,6 @@ curl -fsSL https://raw.githubusercontent.com/vz-shark/vnetviz/main/install.sh \
 It verifies the release's SHA-256 checksum before installing. Pin a version with
 `VNETVIZ_VERSION` (e.g. `VNETVIZ_VERSION=v0.1.0`).
 
-
-## Example
-
-- text output
-  ```
-  $ sudo vnetviz 
-  host
-  ├─ br-8c201ea87893  [bridge]  (demo_frontend)  172.18.0.1/16  up
-  │　└─ veth6dfa4c8  ==( veth )==  eth1  @demo-web-1 (docker)  172.18.0.2/16  up
-  ├─ br-8dad108b2b2b  [bridge]  (demo_backend)  172.19.0.1/16  up
-  │　├─ vetha70dea7  ==( veth )==  eth0  @demo-api-1 (docker)  172.19.0.2/16  up
-  │　├─ vethf03dc6c  ==( veth )==  eth0  @demo-db-1 (docker)  172.19.0.3/16  up
-  │　└─ veth62b5a80  ==( veth )==  eth0  @demo-web-1 (docker)  172.19.0.4/16  up
-  └─ host:8080  ==>  demo-web-1:80/tcp
-
-  demo-web-1 (docker)
-  ├─ eth0  ==( veth )==  veth62b5a80  @host  172.19.0.4/16  up
-  └─ eth1  ==( veth )==  veth6dfa4c8  @host  172.18.0.2/16  up
-
-  demo-db-1 (docker)
-  └─ eth0  ==( veth )==  vethf03dc6c  @host  172.19.0.3/16  up
-
-  demo-api-1 (docker)
-  └─ eth0  ==( veth )==  vetha70dea7  @host  172.19.0.2/16  up
-
-  ```
-
-- SVG output
-  ```
-  sudo vnetviz --format svg -o sample.svg  
-  ```
-<p align="left">
-  <img src="sample-docker.svg" width="600">
-</p>
-
-<!-- - more samples is [here](./samples/) -->
 
 
 
