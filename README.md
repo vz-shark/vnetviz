@@ -1,14 +1,13 @@
 # vnetviz  
 
-**Visualize Linux virtual network topology**  
- (namespace / veth / bridge / bond / vlan / docker / podman)
+**Visualize Linux virtual network topologies**   
+including network namespaces, veth pairs, bridges, Docker, and Podman networks.
 
 ## Why ?
 ### The Problem
 Linux networking can quickly become complex when network namespaces, veth pairs, bridges, Docker, and Podman networks are combined. 
 
-Understanding the topology often requires manually correlating the outputs of commands such as `ip link`, `ip netns`, `bridge`, `docker`, and `podman`, which becomes increasingly difficult as environments grow.
-
+Understanding the topology often requires manually correlating the outputs of commands such as `ip link`, `ip netns`, `bridge`, `docker`, and `podman`. This quickly becomes tedious and error-prone as environments grow.
 
 ### The Solution
 `vnetviz` automatically discovers these relationships and renders them as:
@@ -46,7 +45,7 @@ Understanding the topology often requires manually correlating the outputs of co
 
 - Detect network namespaces
 - Detect veth peer relationships
-- Detect bridges and ports
+- Detect bridges, bonds, and VLANs
 - Docker / Podman support
 - Export to Mermaid / Graphviz (DOT/SVG/PNG)　
 - ASCII output
