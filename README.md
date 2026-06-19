@@ -47,13 +47,13 @@ Understanding the topology often requires manually correlating the outputs of co
 - Detect veth peer relationships
 - Detect bridges, bonds, and VLANs
 - Docker / Podman support
-- Export to Mermaid / Graphviz (DOT/SVG/PNG)　
+- Export to Mermaid / Graphviz (DOT/SVG/PNG)
 - ASCII output
 
 ## Install
 
-One-liner (downloads a prebuilt Linux binary into `/usr/local/bin`, which
-usually needs root — hence `sudo sh`):
+### One-liner  
+(downloads a prebuilt Linux binary into `/usr/local/bin`, which usually needs root — hence `sudo sh`)
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/vz-shark/vnetviz/main/install.sh | sudo sh
@@ -72,10 +72,15 @@ It verifies the release's SHA-256 checksum before installing. Pin a version with
 `VNETVIZ_VERSION` (e.g. `VNETVIZ_VERSION=v0.1.0`).
 
 
-
+### Prebuilt binaries
+Available from the GitHub Releases page:
+[https://github.com/vz-shark/vnetviz/releases](https://github.com/vz-shark/vnetviz/releases)
 
 
 ## Usage
+> **Note**  
+> To inspect network namespaces and containers, `vnetviz` typically needs to run as root.
+
 
 ```bash
 # text tree to stdout: the default format and the default (virtual) scope —
@@ -152,7 +157,7 @@ by the `up` / `down` label only (no custom color, so it reads in both light and
 dark themes); in `dot` output down nodes are grayed and the word is omitted.
 
 With `--collapse` the veth is folded away and the bridge links straight to
-each container interface (`docker0 -> eth0 @web`).
+each container interface (`br-9f3a21 -> eth0 @web`).
 
 ### Options
 
