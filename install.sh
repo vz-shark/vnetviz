@@ -3,15 +3,18 @@
 #
 #   curl -fsSL https://raw.githubusercontent.com/vz-shark/vnetviz/main/install.sh | sudo sh
 #
-# Downloads a prebuilt vnetviz binary from GitHub Releases and installs it into
-# /usr/local/bin. This script never calls sudo itself: if the target directory
-# is not writable it tells you to re-run with sudo (or to pick a writable
+# Downloads a prebuilt vnetviz binary from GitHub Releases and installs it. When
+# run as root (e.g. via sudo) it installs system-wide into /usr/local/bin;
+# unprivileged it installs into the user's own ~/.local/bin (no sudo needed).
+# This script never calls sudo itself: if the chosen directory needs privileges
+# we don't have, it tells you to re-run with sudo (or to pick a writable
 # VNETVIZ_BIN_DIR) and exits. vnetviz is a Linux-only tool, so only linux/amd64
 # and linux/arm64 are published.
 #
 # Environment overrides (mostly for testing / unusual setups):
 #   VNETVIZ_VERSION   release to install: "latest" (default) or a tag like v0.1.0
-#   VNETVIZ_BIN_DIR   install directory (default: /usr/local/bin)
+#   VNETVIZ_BIN_DIR   install directory (default: /usr/local/bin as root,
+#                     else ${XDG_BIN_HOME:-~/.local/bin})
 #   VNETVIZ_BASE_URL  fetch the tarball + checksums.txt directly from this URL
 #                     instead of GitHub Releases (used by the local test harness)
 #   VNETVIZ_NO_VERIFY set to 1 to skip the checksum verification
@@ -19,8 +22,19 @@ set -eu
 
 REPO="vz-shark/vnetviz"
 VERSION="${VNETVIZ_VERSION:-latest}"
-BIN_DIR="${VNETVIZ_BIN_DIR:-/usr/local/bin}"
 BINARY="vnetviz"
+
+# Default install directory. An explicit VNETVIZ_BIN_DIR always wins. Otherwise
+# we install system-wide when running as root (e.g. via sudo) and into the
+# user's own ~/.local/bin when running unprivileged — the de-facto convention
+# for per-user executables, which modern distros add to PATH automatically.
+if [ -n "${VNETVIZ_BIN_DIR:-}" ]; then
+	BIN_DIR="$VNETVIZ_BIN_DIR"
+elif [ "$(id -u)" = "0" ]; then
+	BIN_DIR="/usr/local/bin"
+else
+	BIN_DIR="${XDG_BIN_HOME:-$HOME/.local/bin}"
+fi
 
 # --- logging -----------------------------------------------------------------
 # Level-labelled output, colorized only when stderr is a terminal (plain when
@@ -121,11 +135,10 @@ tar -xzf "$tmp/$asset" -C "$tmp" || die "failed to extract $asset"
 chmod +x "$tmp/$BINARY"
 
 # --- install -----------------------------------------------------------------
-# This script never calls sudo itself. If the target directory is not writable,
-# it explains how to re-run with elevated privileges and exits.
-if [ "$(id -u)" = "0" ] || [ -w "$BIN_DIR" ] ||
-	{ [ ! -e "$BIN_DIR" ] && [ -w "$(dirname "$BIN_DIR")" ]; }; then
-	mkdir -p "$BIN_DIR"
+# This script never calls sudo itself. We create the target directory when we
+# can (always possible for the unprivileged ~/.local/bin default); if the copy
+# would need privileges we don't have, explain how to re-run and exit.
+if mkdir -p "$BIN_DIR" 2>/dev/null && [ -w "$BIN_DIR" ]; then
 	install -m 0755 "$tmp/$BINARY" "$BIN_DIR/$BINARY"
 else
 	error "cannot write to $BIN_DIR without elevated privileges — nothing was installed."

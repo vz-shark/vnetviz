@@ -12,12 +12,36 @@ Understanding the topology often requires manually correlating the outputs of co
 ### The Solution
 `vnetviz` automatically discovers these relationships and renders them as:
 
-- diagrams
+<!-- - diagrams
   <p align="left">
     <img src="sample-docker.svg" width="600">
-  </p>
+  </p> -->
 
-- text tree
+- Diagrams (Mermaid / SVG / PNG)
+```mermaid
+graph TD
+  subgraph ns_NS_5_4026531833_["host"]
+    n_NS_5_4026531833__4["br-09ed09419d65<br/>bridge<br/>(demo_backend)<br/>172.18.0.1/16<br/>up"]
+    n_NS_5_4026531833__5["br-4c108a3fcf61<br/>bridge<br/>(demo_frontend)<br/>172.19.0.1/16<br/>up"]
+    pub_NS_5_4026533521__8080(["host:8080  ==>  demo-web-1:80/tcp"])
+  end
+  subgraph ns_NS_5_4026533521_["demo-web-1 (docker)"]
+    n_NS_5_4026533521__2["eth0<br/>172.18.0.4/16<br/>up"]
+    n_NS_5_4026533521__3["eth1<br/>172.19.0.2/16<br/>up"]
+  end
+  subgraph ns_NS_5_4026533417_["demo-db-1 (docker)"]
+    n_NS_5_4026533417__2["eth0<br/>172.18.0.3/16<br/>up"]
+  end
+  subgraph ns_NS_5_4026533404_["demo-api-1 (docker)"]
+    n_NS_5_4026533404__2["eth0<br/>172.18.0.2/16<br/>up"]
+  end
+  n_NS_5_4026531833__4 --- n_NS_5_4026533404__2
+  n_NS_5_4026531833__4 --- n_NS_5_4026533417__2
+  n_NS_5_4026531833__4 --- n_NS_5_4026533521__2
+  n_NS_5_4026531833__5 --- n_NS_5_4026533521__3
+```
+
+- Text tree
   ```
   $ sudo vnetviz 
   host
@@ -50,30 +74,52 @@ Understanding the topology often requires manually correlating the outputs of co
 - Export to Mermaid / Graphviz (DOT/SVG/PNG)
 - ASCII output
 
+## Supported platforms
+
+- **OS:** Linux only — vnetviz reads live network state via netlink and enters
+  namespaces with `setns`, so it does not run on macOS or Windows.
+- **Architectures:** `amd64` (x86_64) and `arm64` (aarch64); these are the
+  prebuilt binaries published on GitHub Releases.
+- **Privileges:** root (e.g. via `sudo`) is typically required to enter other
+  network namespaces and containers; without it vnetviz still renders what it can
+  reach and tells you when to re-run with `sudo`.
+- **Optional dependencies:**
+  - [Graphviz](https://graphviz.org/) (`dot`) — only for the `svg` and `png`
+    formats; the text, unicode, ascii, mermaid and dot formats need nothing extra.
+  - the `docker` / `podman` CLI — only for container discovery (skipped silently
+    when absent).
+
 ## Install
 
 ### One-liner  
-(downloads a prebuilt Linux binary into `/usr/local/bin`, which usually needs root — hence `sudo sh`)
+The install directory depends on how you run it.
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/vz-shark/vnetviz/main/install.sh | sudo sh
-```
+- System-wide as root (via `sudo`), into `/usr/local/bin`:
 
-The script never calls `sudo` on its own; if `/usr/local/bin` is not writable it
-just tells you to re-run with `sudo`. To install without root, point
-`VNETVIZ_BIN_DIR` at a directory you own:
+  ```bash
+  curl -fsSL https://raw.githubusercontent.com/vz-shark/vnetviz/main/install.sh | sudo sh
+  ```
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/vz-shark/vnetviz/main/install.sh \
-  | VNETVIZ_BIN_DIR="$HOME/.local/bin" sh
-```
+- Just for your user (no root), into `~/.local/bin`:
 
-It verifies the release's SHA-256 checksum before installing. Pin a version with
-`VNETVIZ_VERSION` (e.g. `VNETVIZ_VERSION=v0.1.0`).
+  ```bash
+  curl -fsSL https://raw.githubusercontent.com/vz-shark/vnetviz/main/install.sh | sh
+  ```
+
+- The script never calls `sudo` on its own; if the chosen directory needs
+privileges it doesn't have, it just tells you to re-run with `sudo`. Override the
+location with `VNETVIZ_BIN_DIR`:
+
+  ```bash
+  curl -fsSL https://raw.githubusercontent.com/vz-shark/vnetviz/main/install.sh \
+    | VNETVIZ_BIN_DIR="$HOME/bin" sh
+  ```
+
+- Pin a version with `VNETVIZ_VERSION` (e.g. `VNETVIZ_VERSION=v0.1.0`).
 
 
 ### Prebuilt binaries
-Available from the GitHub Releases page:
+- Available from the GitHub Releases page:
 [https://github.com/vz-shark/vnetviz/releases](https://github.com/vz-shark/vnetviz/releases)
 
 
@@ -83,8 +129,9 @@ Available from the GitHub Releases page:
 
 
 ```bash
-# text tree to stdout: the default format and the default (virtual) scope —
-# bridges, veth, VLANs, netns and containers, but not the host's physical NICs
+# text tree to stdout, with the defaults: the virtual topology (bridges, veth,
+# VLANs, netns and containers, but not the host's physical NICs), IP addresses
+# shown, veth pairs collapsed, and down interfaces hidden
 # (root is needed to enter other namespaces)
 sudo vnetviz
 
@@ -110,7 +157,7 @@ re-run under `sudo` and exits non-zero (no partial diagram is produced):
 
 ```text
 vnetviz: cannot read 1 namespace(s) without root: vztest
-         re-run with: sudo vnetviz --ip
+         re-run with: sudo vnetviz
 ```
 
 The message is colored yellow only when stderr is a terminal, so piped or
@@ -127,15 +174,15 @@ straight in the terminal:
 ```text
 host
 ├─ br-9f3a21  [bridge]  (appnet)  172.18.0.1/16  up
-│　├─ veth9a1  ==( veth )==  eth0  @web (docker)  172.18.0.2/16  up
-│　└─ vethb22  ==( veth )==  eth0  @db (docker)  172.18.0.3/16  up
+│　├─ eth0  @web (docker)  172.18.0.2/16  up
+│　└─ eth0  @db (docker)  172.18.0.3/16  up
 └─ host:8080  ==>  web:80/tcp
 ```
 
 A bridge backed by a Docker/Podman network shows that network's friendly name in
 parentheses (`(appnet)` above), and a published port appears as a self-contained
-`host:<port>` node. Run with `--all` to also include the host's physical NICs and
-loopback.
+`host:<port>` node. Run with `--all` to also include the host's physical NICs,
+loopback, and operationally-down interfaces.
 
 Like `tree(1)`, the default `text` format picks its line-drawing characters
 from the locale: a UTF-8 locale gets Unicode connectors, otherwise it falls back
@@ -145,8 +192,8 @@ unicode` or `--format ascii` to force one regardless of locale:
 ```text
 host
 |-- br-9f3a21  [bridge]  (appnet)  172.18.0.1/16  up
-|   |-- veth9a1  ==( veth )==  eth0  @web (docker)  172.18.0.2/16  up
-|   `-- vethb22  ==( veth )==  eth0  @db (docker)  172.18.0.3/16  up
+|   |-- eth0  @web (docker)  172.18.0.2/16  up
+|   `-- eth0  @db (docker)  172.18.0.3/16  up
 `-- host:8080  ==>  web:80/tcp
 ```
 
@@ -156,37 +203,48 @@ piped or redirected output stays plain. In `mermaid` output the state is shown
 by the `up` / `down` label only (no custom color, so it reads in both light and
 dark themes); in `dot` output down nodes are grayed and the word is omitted.
 
-With `--collapse` the veth is folded away and the bridge links straight to
-each container interface (`br-9f3a21 -> eth0 @web`).
+By default veth pairs are collapsed: the veth node is folded away and the bridge
+links straight to each container interface (`br-9f3a21 -> eth0 @web`, as in the
+trees above). Use `--detail on` to show the individual veth interfaces instead:
+
+```text
+host
+├─ br-9f3a21  [bridge]  (appnet)  172.18.0.1/16  up
+│　├─ veth9a1  ==( veth )==  eth0  @web (docker)  172.18.0.2/16  up
+│　└─ vethb22  ==( veth )==  eth0  @db (docker)  172.18.0.3/16  up
+└─ host:8080  ==>  web:80/tcp
+```
 
 ### Options
 
-Bridges, veth pairs, VLANs, named netns, and Docker/Podman containers — with
-container names, bridge network names, and published-port nodes — are always
-detected (a missing container CLI is skipped silently). The scope flags below
-only add the host's own loopback/physical NICs and addresses.
+Named netns and Docker/Podman containers — with container names, bridge network
+names, and published-port nodes — are always detected (a missing container CLI
+is skipped silently). The scope/display toggles below each take an explicit
+`on` or `off` value (e.g. `--ip off`, `--physical on`); leaving a flag off the
+command line keeps its default. `--all` turns every toggle on at once, but any
+toggle you set by hand still wins (e.g. `--all --ip off`).
 
-| Category | Option | Description |
-|---|---|---|
-| Format | `--format text` | text tree, charset auto-selected from locale (default) |
-|  | `--format unicode` | text tree, forced Unicode line drawing |
-|  | `--format ascii` | text tree, forced ASCII (`tree --charset=ascii`) |
-|  | `--format mermaid` | Mermaid output |
-|  | `--format dot` | Graphviz DOT output |
-|  | `--format svg` | SVG image (requires Graphviz `dot`) |
-|  | `--format png` | PNG image (requires Graphviz `dot`) |
-|  | `-f` | shorthand for `--format` |
-| Output | `--output FILE` | write to FILE instead of stdout |
-|  | `-o FILE` | shorthand for `--output` |
-| Scope | `--virtual` | virtual topology only: adds `--ip` (default) |
-|  | `-v` | shorthand for `--virtual` |
-|  | `--all` | enable `--lo --ip --physical` |
-|  | `--lo` | show loopback interfaces |
-|  | `--ip` | show IP addresses |
-|  | `--physical` | show physical NICs |
-| Display | `--collapse` | collapse veth pairs into a single link |
-|  | `--up-only` | hide interfaces that are operationally down |
-| Misc | `--version` | print version and exit |
+| Category | Option | Default | Description |
+|---|---|---|---|
+| Format | `--format text` | (default) | text tree, charset auto-selected from locale |
+|  | `--format unicode` | | text tree, forced Unicode line drawing |
+|  | `--format ascii` | | text tree, forced ASCII (`tree --charset=ascii`) |
+|  | `--format mermaid` | | Mermaid output |
+|  | `--format dot` | | Graphviz DOT output |
+|  | `--format svg` | | SVG image (requires Graphviz `dot`) |
+|  | `--format png` | | PNG image (requires Graphviz `dot`) |
+|  | `-f` | | shorthand for `--format` |
+| Output | `--output FILE` | | write to FILE instead of stdout |
+|  | `-o FILE` | | shorthand for `--output` |
+| Scope | `--virtual on\|off` | `on` | show virtual devices (veth, bridges, bonds, VLANs, ...) |
+|  | `--lo on\|off` | `off` | show loopback interfaces |
+|  | `--physical on\|off` | `off` | show physical NICs |
+|  | `--all` | | turn every toggle on; per-flag `on\|off` still takes precedence |
+| Display | `--ip on\|off` | `on` | show IP addresses |
+|  | `--detail on\|off` | `off` | show interfaces in full detail (expand collapsed veth pairs) |
+|  | `--upped on\|off` | `on` | show operationally-up interfaces |
+|  | `--downed on\|off` | `off` | show operationally-down interfaces |
+| Misc | `--version` | | print version and exit |
 
 ## How it works
 
@@ -212,17 +270,6 @@ internal/render   Text (ASCII), Mermaid and DOT renderers
 ```
 
 ## Status & roadmap
-
-Supported today:
-
-- network namespaces (host, named netns, Docker/Podman containers)
-- veth pairs matched across namespaces
-- Linux bridges and bridge membership
-- bonds and VLANs (802.1Q)
-- IP addresses, loopback, and physical NICs
-- Docker / Podman container discovery, with friendly network names on bridges
-- published container ports as `host:<port>` nodes
-- up/down state, with `--up-only` to hide down interfaces
 
 Planned:
 

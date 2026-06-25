@@ -24,7 +24,7 @@ func sample() *model.Topology {
 
 func TestMermaidContainsClustersAndEdges(t *testing.T) {
 	out := Mermaid(sample(), Options{})
-	for _, want := range []string{"graph LR", "\"host\"", "\"web (docker)\"", "docker0", "172.17.0.2/16", "veth"} {
+	for _, want := range []string{"graph TD", "\"host\"", "\"web (docker)\"", "docker0", "172.17.0.2/16", "veth"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("mermaid output missing %q\n%s", want, out)
 		}

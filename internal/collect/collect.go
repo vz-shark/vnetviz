@@ -19,10 +19,12 @@ import (
 
 // Options controls what gets collected.
 type Options struct {
+	Virtual  bool // include virtual devices (veth, bridges, bonds, VLANs, ...)
 	Loopback bool // include the loopback interface
 	IP       bool // collect IP addresses
 	Physical bool // include physical NICs
-	UpOnly   bool // skip interfaces that are operationally down
+	Upped    bool // include interfaces that are operationally up
+	Downed   bool // include interfaces that are operationally down
 
 	// Warnf, when set, receives non-fatal warnings (e.g. a namespace that
 	// could not be entered because we are not root).
@@ -235,15 +237,30 @@ func collectLinks(opts Options) ([]*model.Iface, error) {
 		attrs := l.Attrs()
 		typ := classify(l)
 
-		if typ == model.TypeLoopback && !opts.Loopback {
-			continue
-		}
-		if typ == model.TypePhysical && !opts.Physical {
-			continue
+		// Scope filter: each interface belongs to exactly one of loopback,
+		// physical, or "virtual" (everything else — veth, bridges, bonds,
+		// VLANs, tun, ...), gated by its own toggle.
+		switch typ {
+		case model.TypeLoopback:
+			if !opts.Loopback {
+				continue
+			}
+		case model.TypePhysical:
+			if !opts.Physical {
+				continue
+			}
+		default:
+			if !opts.Virtual {
+				continue
+			}
 		}
 
+		// State filter: up and down interfaces are gated independently.
 		up := linkUp(attrs)
-		if opts.UpOnly && !up {
+		if up && !opts.Upped {
+			continue
+		}
+		if !up && !opts.Downed {
 			continue
 		}
 

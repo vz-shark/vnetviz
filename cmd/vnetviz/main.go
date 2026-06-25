@@ -27,17 +27,51 @@ var version = "dev"
 // should exit non-zero without printing it a second time.
 var errReported = errors.New("reported")
 
-// options holds the parsed command-line flags.
+// toggle is an explicit on/off flag value (`--ip on`, `--ip off`). Unlike a
+// plain bool it distinguishes "left at its default" from "explicitly set", which
+// lets --all turn everything on while still yielding to any flag the user set by
+// hand. The zero value is off; seed val with the desired default before
+// registering so the help text and default behavior reflect it.
+type toggle struct {
+	val bool
+}
+
+func (t *toggle) String() string {
+	if t.val {
+		return "on"
+	}
+	return "off"
+}
+
+func (t *toggle) Set(s string) error {
+	switch strings.ToLower(strings.TrimSpace(s)) {
+	case "on", "true", "yes", "1":
+		t.val = true
+	case "off", "false", "no", "0":
+		t.val = false
+	default:
+		return fmt.Errorf("invalid value %q (want on or off)", s)
+	}
+	return nil
+}
+
+func (t *toggle) Type() string { return "on|off" }
+
+// options holds the parsed command-line flags. The toggle defaults are chosen so
+// that running vnetviz with no flags shows the virtual topology with IP
+// addresses, veth pairs collapsed, and only operationally-up interfaces.
 type options struct {
-	format   string
-	output   string
-	lo       bool
-	ip       bool
-	physical bool
-	all      bool
-	virtual  bool
-	collapse bool
-	upOnly   bool
+	format string
+	output string
+	all    bool
+
+	virtual  toggle // show virtual devices (veth, bridges, ...)
+	lo       toggle // show the loopback interface
+	physical toggle // show physical NICs
+	ip       toggle // show IP addresses
+	detail   toggle // show interfaces in full detail (expand collapsed veth pairs)
+	upped    toggle // show operationally-up interfaces
+	downed   toggle // show operationally-down interfaces
 }
 
 func main() {
@@ -50,7 +84,18 @@ func main() {
 }
 
 func newRootCmd() *cobra.Command {
-	var opt options
+	// Seed each toggle with its default so `--flag` is optional and the help
+	// shows the default. With no flags this is the virtual topology, IPs on,
+	// collapsed, up-only.
+	opt := options{
+		virtual:  toggle{val: true},
+		lo:       toggle{val: false},
+		physical: toggle{val: false},
+		ip:       toggle{val: true},
+		detail:   toggle{val: false},
+		upped:    toggle{val: true},
+		downed:   toggle{val: false},
+	}
 	cmd := &cobra.Command{
 		Use:           "vnetviz",
 		Short:         "Visualize Linux network topology as a tree, Mermaid, or Graphviz",
@@ -58,8 +103,8 @@ func newRootCmd() *cobra.Command {
 		Args:          cobra.NoArgs,
 		SilenceUsage:  true,
 		SilenceErrors: true,
-		RunE: func(_ *cobra.Command, _ []string) error {
-			return runVnetviz(&opt)
+		RunE: func(c *cobra.Command, _ []string) error {
+			return runVnetviz(c.Flags(), &opt)
 		},
 	}
 
@@ -67,13 +112,14 @@ func newRootCmd() *cobra.Command {
 	f.SortFlags = false
 	f.StringVarP(&opt.format, "format", "f", "text", "output format: text | unicode | ascii | mermaid | dot | svg | png")
 	f.StringVarP(&opt.output, "output", "o", "", "write to `FILE` instead of stdout")
-	f.BoolVarP(&opt.virtual, "virtual", "v", false, "virtual topology only: --ip (no loopback or physical)")
-	f.BoolVar(&opt.all, "all", false, "enable everything (--lo --ip --physical)")
-	f.BoolVar(&opt.lo, "lo", false, "show loopback interfaces")
-	f.BoolVar(&opt.ip, "ip", false, "show IP addresses")
-	f.BoolVar(&opt.physical, "physical", false, "show physical NICs")
-	f.BoolVar(&opt.collapse, "collapse", false, "collapse veth pairs into a single link")
-	f.BoolVar(&opt.upOnly, "up-only", false, "hide interfaces that are operationally down")
+	f.Var(&opt.virtual, "virtual", "show virtual devices (veth, bridges, bonds, VLANs, ...)")
+	f.Var(&opt.lo, "lo", "show loopback interfaces")
+	f.Var(&opt.physical, "physical", "show physical NICs")
+	f.Var(&opt.ip, "ip", "show IP addresses")
+	f.Var(&opt.detail, "detail", "show interfaces in full detail")
+	f.Var(&opt.upped, "upped", "show operationally-up interfaces")
+	f.Var(&opt.downed, "downed", "show operationally-down interfaces")
+	f.BoolVar(&opt.all, "all", false, "show everything; per-flag on|off still takes precedence")
 
 	cmd.SetVersionTemplate("vnetviz {{.Version}}\n")
 	cmd.CompletionOptions.DisableDefaultCmd = true
@@ -82,28 +128,25 @@ func newRootCmd() *cobra.Command {
 	return cmd
 }
 
-func runVnetviz(opt *options) error {
-	if opt.all {
-		opt.lo, opt.ip, opt.physical = true, true, true
+// resolveToggle reduces a toggle to its final value: an explicitly-set flag
+// always wins; otherwise --all forces it on, falling back to the default.
+func resolveToggle(flags *pflag.FlagSet, all bool, name string, t toggle) bool {
+	if all && !flags.Changed(name) {
+		return true
 	}
-	// The virtual topology is the default view: with no scope flags we behave as
-	// --virtual. Passing any scope flag (or --all) opts out of the default, so
-	// e.g. `--physical` shows only physical NICs while `--virtual --physical`
-	// adds them on top of the virtual set.
-	if !opt.all && !opt.virtual && !opt.lo && !opt.ip && !opt.physical {
-		opt.virtual = true
-	}
-	// --virtual surfaces addresses on top of the always-on virtual topology, but
-	// leaves --lo / --physical off unless asked.
-	if opt.virtual {
-		opt.ip = true
-	}
+	return t.val
+}
+
+func runVnetviz(flags *pflag.FlagSet, opt *options) error {
+	pick := func(name string, t toggle) bool { return resolveToggle(flags, opt.all, name, t) }
 
 	collectOpts := collect.Options{
-		Loopback: opt.lo,
-		IP:       opt.ip,
-		Physical: opt.physical,
-		UpOnly:   opt.upOnly,
+		Virtual:  pick("virtual", opt.virtual),
+		Loopback: pick("lo", opt.lo),
+		IP:       pick("ip", opt.ip),
+		Physical: pick("physical", opt.physical),
+		Upped:    pick("upped", opt.upped),
+		Downed:   pick("downed", opt.downed),
 		Warnf: func(format string, args ...any) {
 			fmt.Fprintf(os.Stderr, "vnetviz: warning: "+format+"\n", args...)
 		},
@@ -120,7 +163,7 @@ func runVnetviz(opt *options) error {
 		return errReported
 	}
 
-	renderOpts := render.Options{CollapseVeth: opt.collapse}
+	renderOpts := render.Options{CollapseVeth: !pick("detail", opt.detail)}
 	// Highlight the text output's "down" token only when it is heading straight
 	// to a terminal, so piped or file (`-o`) output stays free of ANSI codes.
 	if opt.output == "" && isTerminal(os.Stdout) {
@@ -212,8 +255,8 @@ func usageFunc(cmd *cobra.Command) error {
 		names []string
 	}{
 		{"Output:", []string{"format", "output"}},
-		{"Scope (default: --virtual):", []string{"virtual", "all", "lo", "ip", "physical"}},
-		{"Display:", []string{"collapse", "up-only"}},
+		{"Scope (each on|off):", []string{"virtual", "lo", "physical", "all"}},
+		{"Display (each on|off):", []string{"ip", "detail", "upped", "downed"}},
 		{"Other:", []string{"help", "version"}},
 	}
 	for _, g := range groups {

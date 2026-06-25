@@ -16,10 +16,9 @@ func Mermaid(t *model.Topology, opts Options) string {
 	nodes := visibleNodes(t, edges, opts.CollapseVeth)
 
 	var b strings.Builder
-	// Left-to-right flow: the host/container chain runs horizontally (only a few
-	// ranks deep) while sibling interfaces stack vertically, which keeps wide
-	// topologies from sprawling sideways and shrinking to an unreadable size.
-	b.WriteString("graph LR\n")
+	// Top-down flow: the host/container chain runs vertically while sibling
+	// interfaces spread horizontally.
+	b.WriteString("graph TD\n")
 
 	for _, ns := range t.Namespaces {
 		ifaces := nodes[ns]
